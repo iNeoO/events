@@ -1,0 +1,15 @@
+services:
+  postgres:
+    container_name: events-postgres-dev
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${PG_EVENTS_DB}
+      POSTGRES_USER: ${PG_EVENTS_USER}
+      POSTGRES_PASSWORD: ${PG_EVENTS_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

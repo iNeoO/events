@@ -1,0 +1,30 @@
+{
+  "name": "@events/services",
+  "type": "module",
+  "scripts": {
+    "dev:services": "tsx watch --clear-screen=false src/index.ts",
+    "test": "vitest",
+    "lint": "biome check",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@events/common": "workspace:*",
+    "@events/db": "workspace:*",
+    "vitest": "^4.0.18"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@types/node": "catalog:",
+    "@types/nodemailer": "^7.0.9",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "events",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "backend:dev": "dotenv -e .env -- pnpm --filter @events/backend backend:dev",
+    "backend:build": "dotenv -e .env -- pnpm --filter @events/backend build",
+    "infra:dev": "dotenv -e .env -- pnpm --filter @events/infra dev",
+    "infra:build": "pnpm --filter @events/infra build",
+    "common:dev": "pnpm --filter @events/common dev",
+    "services:dev": "dotenv -e .env -- pnpm --filter @events/services dev:services",
+    "services:build": "dotenv -e .env -- pnpm --filter @events/services build",
+    "common:build": "pnpm --filter @events/common build",
+    "frontend:dev": "dotenv -e .env -- pnpm --filter @events/frontend dev",
+    "frontend:build": "dotenv -e .env -- pnpm --filter @events/frontend build",
+    "db:build": "dotenv -e .env -- pnpm --filter @events/db build",
+    "db:generate": "dotenv -e .env -- pnpm --filter @events/db generate",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @events/db migrate",
+    "db:deploy": "dotenv -e .env -- pnpm --filter @events/db deploy",
+    "db:reset": "dotenv -e .env -- pnpm --filter @events/db reset",
+    "db:seed": "dotenv -e .env -- pnpm --filter @events/db seed",
+    "backend:start": "dotenv -e .env -- pnpm --filter @events/backend backend:start",
+    "dev:libs:build": "pnpm run common:build && pnpm run infra:build && pnpm run services:build",
+    "dev:runtime": "concurrently -k \"pnpm run backend:dev\" \"pnpm run frontend:dev\"",
+    "dev": "pnpm run dev:libs:build && pnpm run dev:runtime",
+    "build": "pnpm run common:build && pnpm run infra:build && pnpm run services:build && pnpm run backend:build && pnpm run frontend:build",
+    "start": "concurrently -k \"pnpm run backend:start\" \"pnpm run frontend:start\"",
+    "lint": "pnpm -r run lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv-cli": "^11.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

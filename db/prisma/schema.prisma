@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Severity {
+  info
+  warning
+  critical
+}
+
+model Event {
+  id        String   @id
+  assetId   String
+  assetType String
+  algorithm String
+  severity  Severity
+  sourceIp  String
+  observedAt DateTime
+  eventType String
+
+  @@index([observedAt])
+  @@index([algorithm])
+  @@index([assetType])
+  @@index([assetId])
+  @@index([assetId, algorithm])
+  @@index([eventType])
+  @@index([sourceIp])
+}
