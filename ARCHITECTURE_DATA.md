@@ -31,7 +31,7 @@ This is a pragmatic model for an events stream: append-heavy writes, filter-heav
 
 - `observedAt`
   - Used by date-range filters (`startDate/endDate`, `from/to`) and time-based sorting.
-  - Critical for `/events` timeline navigation and stats windows (last 7/30 days).
+  - Critical for `/events` timeline navigation and stable pagination.
   - Index impact: avoids full scans on time-bounded queries.
 
 - `assetId`
@@ -40,18 +40,18 @@ This is a pragmatic model for an events stream: append-heavy writes, filter-heav
   - Index impact: fast lookup for a single asset history.
 
 - `assetType`
-  - Used as a categorical filter in `/events` and stats endpoints.
-  - Often combined with date/severity for dashboards.
+  - Used as a categorical filter in `/events`.
+  - Often combined with date/severity in filtered event exploration.
   - Index impact: reduces scanned rows for type-specific views.
 
 - `algorithm`
-  - Core dimension for `/stats/by-algorithm` and inventory-related stats.
-  - Also used in `/events` filtering.
+  - Used in `/events` filtering and inventory-style queries.
+  - Stats-by-algorithm is primarily served from Redis/aggregate tables.
   - Index impact: improves grouped/filter access on algorithm-centric queries.
 
 - `severity`
   - Business-critical filter for risk-focused views and incident triage.
-  - Frequently combined with `assetType` and time filters in stats use cases.
+  - Frequently combined with `assetType` and time filters in `/events`.
   - Recommended index if severity filtering volume increases.
 
 - `eventType`
@@ -60,7 +60,8 @@ This is a pragmatic model for an events stream: append-heavy writes, filter-heav
   - Index impact: faster category filtering, especially when paired with other predicates.
 
 - `sourceIp`
-  - Required by `/stats/top-source-ips` and direct `/events` filtering.
+  - Used for direct `/events` filtering.
+  - `/stats/top-source-ips` is primarily served from Redis/aggregate tables.
   - Supports suspicious-source analysis and top-N reporting.
   - Index impact: reduces cost of source-based group/filter operations.
 
@@ -69,7 +70,35 @@ This is a pragmatic model for an events stream: append-heavy writes, filter-heav
   - Matches access pattern where both columns are constrained/aggregated together.
   - Index impact: more efficient than separate indexes for this combined shape.
 
-4. If traffic grows, consider BRIN on time:
+### Index usage observability for `/events`, stats, and future worker reads
+
+Current state: stats are still computed from raw `Event` queries, so indexes must support both `/events` and stats access paths.  
+Near-future target: stats move to Redis buckets + worker with Postgres aggregate-table fallback.
+
+Indexing priority by phase:
+- Now: optimize `/events` plus current stats endpoints on raw events.
+- Next: keep raw `Event` indexes focused on `/events` and worker correction/reconciliation windows.
+
+- Track query plans for the main raw-event access paths:
+  - `/events` with common filter combinations (`observedAt`, `assetType`, `algorithm`, `eventType`, `sourceIp`)
+  - current stats queries on raw `Event` during transition (`events-per-day`, `by-algorithm`, `top-source-ips`)
+  - worker correction window reads (for example last 5–15 minutes)
+  - Use `EXPLAIN (ANALYZE, BUFFERS)` on representative windows.
+
+- Track index usage metrics:
+  - `pg_stat_user_indexes.idx_scan`: confirms whether an index is used.
+  - `pg_stat_user_tables.seq_scan`: rising values can indicate missing or ineffective indexes.
+  - `pg_statio_user_indexes`: helps detect poor index cache behavior.
+
+- Revisit indexes based on real traffic:
+  - Add/adjust composite indexes when `/events` predicates are repeatedly combined (for example `observedAt + assetType`, `observedAt + severity`, `assetId + observedAt`).
+  - Drop indexes with near-zero scans to reduce write amplification on append-heavy ingestion.
+
+- Review cadence:
+  - Perform index usage review after each major `/events` feature and at regular intervals (for example monthly).
+  - Keep this as part of performance regression checks, not a one-time setup task.
+
+If traffic grows, consider BRIN on time:
 - `BRIN(observedAt)` for very large append-only tables (often with partitioning).
 
 ## 2) Aggregation approach and scalability
@@ -164,3 +193,6 @@ Use PostgreSQL as source of truth and Redis as low-latency stats store.
 2. Implement minute-bucket worker with incremental flush + correction window.
 3. Add fallback logic in stats service: Redis hot path, Postgres aggregate fallback.
 4. Add observability: queue lag, bucket flush delay, Redis hit ratio, drift metrics.
+5. Add tests
+6. Add dockerfile
+7. add tests + lint + build in ci
