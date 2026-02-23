@@ -49,11 +49,6 @@ This is a pragmatic model for an events stream: append-heavy writes, filter-heav
   - Stats-by-algorithm is primarily served from Redis/aggregate tables.
   - Index impact: improves grouped/filter access on algorithm-centric queries.
 
-- `severity`
-  - Business-critical filter for risk-focused views and incident triage.
-  - Frequently combined with `assetType` and time filters in `/events`.
-  - Recommended index if severity filtering volume increases.
-
 - `eventType`
   - Used for event categorization (`observed`, `rotation`, etc.) in `/events`.
   - Useful for workflow-specific slices of data.
@@ -83,20 +78,15 @@ Indexing priority by phase:
   - `/events` with common filter combinations (`observedAt`, `assetType`, `algorithm`, `eventType`, `sourceIp`)
   - current stats queries on raw `Event` during transition (`events-per-day`, `by-algorithm`, `top-source-ips`)
   - worker correction window reads (for example last 5–15 minutes)
-  - Use `EXPLAIN (ANALYZE, BUFFERS)` on representative windows.
 
-- Track index usage metrics:
-  - `pg_stat_user_indexes.idx_scan`: confirms whether an index is used.
-  - `pg_stat_user_tables.seq_scan`: rising values can indicate missing or ineffective indexes.
-  - `pg_statio_user_indexes`: helps detect poor index cache behavior.
+- Indexing policy for `/events`:
+  - Evolve indexes from observed production query patterns.
+  - Prioritize composite indexes for frequent predicate combinations (for example `observedAt + assetType`, `observedAt + severity`, `assetId + observedAt`).
+  - Remove low-value indexes to limit write amplification on append-heavy ingestion.
 
-- Revisit indexes based on real traffic:
-  - Add/adjust composite indexes when `/events` predicates are repeatedly combined (for example `observedAt + assetType`, `observedAt + severity`, `assetId + observedAt`).
-  - Drop indexes with near-zero scans to reduce write amplification on append-heavy ingestion.
-
-- Review cadence:
-  - Perform index usage review after each major `/events` feature and at regular intervals (for example monthly).
-  - Keep this as part of performance regression checks, not a one-time setup task.
+- Operational cadence:
+  - Reassess indexing after major `/events` changes and on a regular monthly cycle.
+  - Treat this as part of performance regression governance, not a one-time task.
 
 If traffic grows, consider BRIN on time:
 - `BRIN(observedAt)` for very large append-only tables (often with partitioning).
