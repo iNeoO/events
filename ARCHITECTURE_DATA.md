@@ -3,6 +3,7 @@
 ## 1) Data model and indexing strategy
 
 ### Current model
+
 The system stores security observations in a single `Event` table:
 
 - `id` (PK)
@@ -71,6 +72,7 @@ Current state: stats are still computed from raw `Event` queries, so indexes mus
 Near-future target: stats move to Redis buckets + worker with Postgres aggregate-table fallback.
 
 Indexing priority by phase:
+
 - Now: optimize `/events` plus current stats endpoints on raw events.
 - Next: keep raw `Event` indexes focused on `/events` and worker correction/reconciliation windows.
 
@@ -89,6 +91,7 @@ Indexing priority by phase:
   - Treat this as part of performance regression governance, not a one-time task.
 
 If traffic grows, consider BRIN on time:
+
 - `BRIN(observedAt)` for very large append-only tables (often with partitioning).
 
 ## 2) Aggregation approach and scalability
@@ -98,10 +101,12 @@ If traffic grows, consider BRIN on time:
 Aggregations are computed on-demand from raw `Event` data (`groupBy`, filtered scans, in-memory post-processing).
 
 Pros:
+
 - Simple implementation
 - No pre-aggregation maintenance complexity
 
 Limits at scale:
+
 - Expensive repeated scans for dashboards
 - Rising latency with larger retention windows
 - Potential database contention between ingest and analytics
@@ -112,23 +117,27 @@ Use PostgreSQL as source of truth and Redis as low-latency stats store.
 
 #### Design
 
-1. Real-time minute buckets in Redis  
+1. Real-time minute buckets in Redis
+
 - For each ingested event, increment minute-level counters:
   - `stats:{tenant}:events:minute:{YYYYMMDDHHmm}`
   - `stats:{tenant}:algo:minute:{YYYYMMDDHHmm}:{algorithm}`
   - `stats:{tenant}:algo_severity:minute:{YYYYMMDDHHmm}:{algorithm}:{severity}`
   - `stats:{tenant}:source_ip:minute:{YYYYMMDDHHmm}` (sorted set with `ZINCRBY`)
 
-2. Incremental flush worker (every minute, or configurable)  
+2. Incremental flush worker (every minute, or configurable)
+
 - Read closed buckets (for example minute `t-1`) and upsert into Postgres aggregate tables.
 - Do not recompute from raw events each cycle.
 - This keeps CPU and DB load stable as volume grows.
 
-3. Correction window for late/out-of-order events  
+3. Correction window for late/out-of-order events
+
 - Reprocess and re-upsert the last 5–15 minutes each run.
 - Guarantees eventual consistency without full recompute.
 
-4. Read strategy  
+4. Read strategy
+
 - Dashboard endpoints read Redis for hot windows (last 60 min / last 24h).
 - For cold windows or cache miss, read Postgres aggregate tables.
 
@@ -141,11 +150,13 @@ Use PostgreSQL as source of truth and Redis as low-latency stats store.
 ## 3) Performance optimizations and future evolution (high volume, streaming)
 
 ### Near term
+
 - Add aggregate tables in Postgres (minute and day granularity).
 - Implement worker idempotency (`SETNX processed:{eventId}` with TTL) to avoid double-counting.
 - Add backfill/reconciliation job: compare Redis/Postgres for recent windows and repair drift.
 
 ### High volume
+
 - Partition raw `Event` by time (`observedAt`) for write/read isolation.
 - Keep hot buckets in Redis with TTL; keep long-term historical stats in Postgres.
 - Add composite indexes on aggregate tables for common dashboard queries (`tenantId + bucketStart`, `tenantId + algorithm + bucketStart`).
@@ -153,9 +164,10 @@ Use PostgreSQL as source of truth and Redis as low-latency stats store.
   - keep recent data in hot storage (Postgres primary),
   - after a retention threshold (for example 90/180 days), move old events to cold storage (object storage or archive DB),
   - keep only aggregates or minimal metadata in hot storage for old periods.
-  This reduces primary database cost and improves performance, with low product impact since very old raw events are rarely queried.
+    This reduces primary database cost and improves performance, with low product impact since very old raw events are rarely queried.
 
 ### Streaming evolution
+
 - Add queue/outbox between API ingestion and aggregation worker.
 - Worker consumes asynchronously, batches writes, and flushes in pipeline/upsert mode.
 - Scale workers horizontally by tenant/date shard when throughput increases.
@@ -179,6 +191,7 @@ Use PostgreSQL as source of truth and Redis as low-latency stats store.
 
 ## 5) What I would improve with two extra days
 
+0. fix filter on date range (frontend), add filters on dashboard (frontend)
 1. Create Postgres aggregate tables (`stats_minute`, `stats_day`, `stats_algo_minute`, `stats_source_ip_minute`).
 2. Implement minute-bucket worker with incremental flush + correction window.
 3. Add fallback logic in stats service: Redis hot path, Postgres aggregate fallback.

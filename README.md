@@ -5,7 +5,7 @@ The architecture of this repository is inspired by: https://github.com/iNeoO/url
 ```bash
 cp .env.exemple .env
 pnpm install
-docker compose up 
+docker compose up
 pnpm run db:migrate
 pnpm run db:generate
 pnpm run db:build
@@ -15,4 +15,11 @@ pnpm run backend:build
 pnpm run dev
 # app: http://localhost:5173
 # api: http://localhost:4000
+# openapi: http://localhost:5173/api/openapi/ui
+```
+
+## seed
+
+```bash
+pmnpm run db:seed
 ```
